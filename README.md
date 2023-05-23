@@ -1,6 +1,6 @@
 # PGFs
 **PGFs implements a file system using PostgreSQL, adopting the "Adjacency List Model" to store files and directories.**<br>
-The aim is to provide a tool that can manipulate a file system like structure (CRUD operations) stored in a Postgres database. The design of this project allows to perform common file system operations like creating files/directories, moving, renaming, and deleting, along with the ability to reset the filesystem. 
+The aim is to provide a tool that can manipulate a file system like structure (CRUD operations) stored in a Postgres database.
 
 ### Limitation
 It's important to note that the PGFs does not provide an underlying backend to store the actual file data. Instead, it focuses on simulating file system operations and storing metadata in a PostgreSQL database.
