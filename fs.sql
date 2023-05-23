@@ -19,19 +19,26 @@ COMMENT ON COLUMN fs.atime IS 'This column stores the last access time of the fi
 COMMENT ON COLUMN fs.mtime IS 'This column stores the last modification time of the file or directory.';
 COMMENT ON COLUMN fs.parent IS 'This UUID column stores the id of the parent directory of the current file or directory.It has a foreign key constraint referencing the ''id'' column of the same ''fs'' table. when a directory is deleted, all of its contents (files and directories) are also deleted.';
 
+
+
 -- Creating index idx_fs_parent on 'parent' column.
 -- This index is useful to quickly find all files and directories within a specific parent directory.
 CREATE INDEX idx_fs_parent ON fs (parent);
-
 -- Creating index idx_fs_name on 'name' column.
 -- This index is useful to quickly find a file or directory by its name.
 CREATE INDEX idx_fs_name ON fs (name);
+
+
 
 -- Inserting the root directory record into the 'fs' table.
 -- The root directory is the top-level directory that does not have any parent directory.
 -- Its 'id' is a predefined UUID, 'name' is an empty string, and 'dir' is set to TRUE indicating it's a directory.
 INSERT INTO fs (id, name, dir, parent)
 VALUES ('11111111-1111-1111-1111-111111111111', '', TRUE, NULL);
+
+
+
+
 
 -- stat: This function returns the metadata of the file or directory specified by the given file path.
 CREATE OR REPLACE FUNCTION stat(filepath TEXT)
@@ -77,6 +84,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION stat IS 'This function returns the metadata of the file or directory specified by the given file path.';
+
+
+
+
 
 -- ls: The ls function lists the contents of a directory specified by the file path.
 -- It uses the stat function to get the UUID of the file path, then a recursive CTE
@@ -135,6 +146,10 @@ END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION ls IS 'The ls function lists the contents of a directory specified by the file path.';
 
+
+
+
+
 -- tree: The tree function returns all files and directories under the specified directory recursively.
 -- It works similarly to the ls function, but it does not limit its output to the immediate children.
 CREATE OR REPLACE FUNCTION tree(filepath TEXT)
@@ -189,6 +204,10 @@ END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION tree IS 'The tree function returns all files and directories under the specified directory recursively.';
 
+
+
+
+
 -- touch: The touch function is used to create a new file.
 -- It takes a file path and a name as parameters,
 -- then creates a new file with the provided name in the specified directory.
@@ -214,6 +233,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION touch IS 'This function is used to create a new file.';
+
+
+
+
 
 -- mkdir: The mkdir function creates a new directory.
 -- It creates all the directories in the file path that do not exist already.
@@ -257,6 +280,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION mkdir IS 'This function creates a new directory recursively. Equivalent to mkdir -p';
+
+
+
+
 
 -- mv: The mv function is used to move or rename files or directories.
 -- It takes an old file path and a new file path as parameters,
@@ -314,6 +341,10 @@ END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION mv IS 'The mv function is used to move or rename files or directories.';
 
+
+
+
+
 -- rm: The rm function is used to delete a file or directory.
 -- It takes a file path as a parameter and deletes the file or directory at that path.
 CREATE OR REPLACE FUNCTION rm(filepath TEXT)
@@ -340,6 +371,10 @@ END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION rm IS 'The rm function is used to delete a file or directory recursively, Equivalent to rm -rf';
 
+
+
+
+
 -- reset: The reset function deletes all files and directories except the root.
 -- It can be useful when you want to reset the state of the filesystem.
 CREATE OR REPLACE FUNCTION reset()
@@ -351,6 +386,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION rm IS 'This function deletes all files and directories except the root.';
+
+
+
 
 -- parseroot: This function takes a file path as input. If the file path is an empty string,
 -- it returns '/', else it returns the file path itself.
@@ -366,6 +404,9 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
+
+
+
 
 CREATE OR REPLACE FUNCTION validfname(filename TEXT)
     RETURNS VOID
@@ -384,6 +425,9 @@ END;
 $$
     LANGUAGE plpgsql;
 
+
+
+
 CREATE OR REPLACE FUNCTION validfpath(filepath TEXT)
     RETURNS VOID
 AS
@@ -400,6 +444,9 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
+
+
+
 
 -- if filepath is / (root) then throw exception. useful for function like rm('/')
 CREATE OR REPLACE FUNCTION denyroot(filepath TEXT, op TEXT)
