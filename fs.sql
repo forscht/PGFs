@@ -43,8 +43,7 @@ CREATE OR REPLACE FUNCTION stat(filepath TEXT)
     RETURNS TABLE
             (
                 ID     UUID,
-                NAME   VARCHAR(255),
-                PATH   TEXT,
+                NAME   TEXT,
                 DIR    BOOL,
                 ATIME  TIMESTAMP,
                 MTIME  TIMESTAMP,
@@ -71,8 +70,7 @@ BEGIN
                             FROM fs f
                                      JOIN vfs p ON f.parent = p.id)
         SELECT vfs.id,
-               vfs.name,
-               parseroot(vfs.path) AS path,
+               parseroot(vfs.path) AS name,
                vfs.dir,
                vfs.atime,
                vfs.mtime,
@@ -92,8 +90,7 @@ CREATE OR REPLACE FUNCTION ls(filepath TEXT)
     RETURNS TABLE
             (
                 ID     UUID,
-                NAME   VARCHAR(255),
-                PATH   TEXT,
+                NAME   TEXT,
                 DIR    BOOL,
                 ATIME  TIMESTAMP,
                 MTIME  TIMESTAMP,
@@ -131,8 +128,7 @@ BEGIN
                             FROM fs f
                                      JOIN vfs p ON f.parent = p.id AND p.id = _id)
         SELECT vfs.id,
-               vfs.name,
-               parseroot(vfs.path) AS path,
+               parseroot(vfs.path) AS name,
                vfs.dir,
                vfs.atime,
                vfs.mtime,
@@ -144,15 +140,13 @@ COMMENT ON FUNCTION ls IS 'The ls function lists the contents of a directory spe
 
 
 
-
 -- tree: The tree function returns all files and directories under the specified directory recursively.
 -- It works similarly to the ls function, but it does not limit its output to the immediate children.
 CREATE OR REPLACE FUNCTION tree(filepath TEXT)
     RETURNS TABLE
             (
                 ID     UUID,
-                NAME   VARCHAR(255),
-                PATH   TEXT,
+                NAME   TEXT,
                 DIR    BOOL,
                 ATIME  TIMESTAMP,
                 MTIME  TIMESTAMP,
@@ -188,8 +182,7 @@ BEGIN
                             FROM fs f
                                      JOIN vfs p ON f.parent = p.id)
         SELECT vfs.id,
-               vfs.name,
-               parseroot(vfs.path) AS path,
+               parseroot(vfs.path) AS name,
                vfs.dir,
                vfs.atime,
                vfs.mtime,
