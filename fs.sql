@@ -63,9 +63,7 @@ BEGIN
                            (SELECT *, fs.name::TEXT AS path
                             FROM fs
                             WHERE fs.parent IS NULL
-
                             UNION ALL
-
                             SELECT f.*, p.path || '/' || f.name AS path
                             FROM fs f
                                      JOIN vfs p ON f.parent = p.id)
@@ -121,9 +119,7 @@ BEGIN
                            (SELECT *, filepath AS path
                             FROM fs
                             WHERE fs.id = _id
-
                             UNION ALL
-
                             SELECT f.*, p.path || '/' || f.name AS path
                             FROM fs f
                                      JOIN vfs p ON f.parent = p.id AND p.id = _id)
@@ -134,7 +130,7 @@ BEGIN
                vfs.mtime,
                vfs.parent
         FROM vfs
-        WHERE vfs.name != filepath;
+        WHERE parseroot(vfs.path) != filepath;
 END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION ls IS 'The ls function lists the contents of a directory specified by the file path.';
@@ -189,7 +185,7 @@ BEGIN
                vfs.mtime,
                vfs.parent
         FROM vfs
-        WHERE vfs.name != filepath;
+        WHERE parseroot(vfs.path) != filepath;
 END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION tree IS 'The tree function returns all files and directories under the specified directory recursively.';
