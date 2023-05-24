@@ -133,7 +133,8 @@ BEGIN
                vfs.atime,
                vfs.mtime,
                vfs.parent
-        FROM vfs;
+        FROM vfs
+        WHERE vfs.name != filepath;
 END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION ls IS 'The ls function lists the contents of a directory specified by the file path.';
@@ -187,7 +188,8 @@ BEGIN
                vfs.atime,
                vfs.mtime,
                vfs.parent
-        FROM vfs;
+        FROM vfs
+        WHERE vfs.name != filepath;
 END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION tree IS 'The tree function returns all files and directories under the specified directory recursively.';
@@ -202,17 +204,18 @@ CREATE OR REPLACE FUNCTION touch(filepath TEXT, fname VARCHAR)
 AS
 $$
 DECLARE
-    _id UUID;
+    _id  UUID;
+    _dir BOOL;
 BEGIN
     --- sanitize inputs
     filepath = sanitizefpath(filepath, TRUE, 'touch');
     PERFORM validfname(fname::TEXT);
 
-    SELECT s.id
+    SELECT s.id, s.dir
     FROM stat(filepath) AS s
-    INTO _id;
+    INTO _id, _dir;
 
-    IF _id IS NULL THEN
+    IF _id IS NULL OR _dir = FALSE THEN
         RAISE EXCEPTION 'path does not exist' USING ERRCODE = 'D0001';
     END IF;
     RETURN QUERY INSERT INTO fs (name, dir, parent) VALUES (fname, FALSE, _id) RETURNING *;
@@ -233,6 +236,7 @@ DECLARE
     _parent_id UUID;
     _path      TEXT[] := STRING_TO_ARRAY(sanitizefpath(filepath, FALSE, 'mkdir'), '/');
     _name      TEXT;
+    _dir       BOOL;
 BEGIN
     --- sanitize inputs
     filepath = sanitizefpath(filepath, FALSE, 'mkdir');
@@ -243,12 +247,15 @@ BEGIN
             _name := _path[i];
 
             -- Tries to find the current part of the path in the parent directory
-            SELECT id
-            INTO _id
+            SELECT id, dir
+            INTO _id, _dir
             FROM fs
             WHERE name = _name
               AND (i = 1 OR parent = _parent_id);
 
+            IF _dir = FALSE THEN
+                RAISE EXCEPTION 'path does not exist' USING ERRCODE = 'D0001';
+            END IF;
             -- If the directory doesn't exist, create it
             IF _id IS NULL THEN
                 INSERT INTO fs (name, dir, parent) VALUES (_name, TRUE, _parent_id) RETURNING id INTO _id;
@@ -404,6 +411,8 @@ CREATE OR REPLACE FUNCTION sanitizefpath(filepath TEXT, root BOOL, op TEXT)
 AS
 $$
 BEGIN
+    -- merge slashes /home//darsh -> /home/darsh
+    filepath = REGEXP_REPLACE(filepath, '/+', '/', 'g');
     -- root path is not allowed for few operations
     IF root = FALSE AND filepath = '/' THEN
         RAISE EXCEPTION 'operation % not allowed on root directory', op USING ERRCODE = 'D0006';
@@ -425,4 +434,3 @@ BEGIN
     RETURN filepath;
 END;
 $$ LANGUAGE plpgsql;
-
