@@ -38,8 +38,6 @@ VALUES ('11111111-1111-1111-1111-111111111111', '', TRUE, NULL);
 
 
 
-
-
 -- stat: This function returns the metadata of the file or directory specified by the given file path.
 CREATE OR REPLACE FUNCTION stat(filepath TEXT)
     RETURNS TABLE
@@ -58,7 +56,7 @@ DECLARE
     _id UUID;
 BEGIN
     --- sanitize inputs
-    PERFORM validfpath(filepath);
+    filepath = sanitizefpath(filepath, TRUE, 'stat');
 
     RETURN QUERY
         WITH RECURSIVE vfs
@@ -87,8 +85,6 @@ COMMENT ON FUNCTION stat IS 'This function returns the metadata of the file or d
 
 
 
-
-
 -- ls: The ls function lists the contents of a directory specified by the file path.
 -- It uses the stat function to get the UUID of the file path, then a recursive CTE
 -- to retrieve the files and directories under the specified directory.
@@ -109,7 +105,7 @@ DECLARE
     _id UUID;
 BEGIN
     --- sanitize inputs
-    PERFORM validfpath(filepath);
+    filepath = sanitizefpath(filepath, TRUE, 'ls');
 
     SELECT s.id
     FROM stat(filepath) AS s
@@ -149,7 +145,6 @@ COMMENT ON FUNCTION ls IS 'The ls function lists the contents of a directory spe
 
 
 
-
 -- tree: The tree function returns all files and directories under the specified directory recursively.
 -- It works similarly to the ls function, but it does not limit its output to the immediate children.
 CREATE OR REPLACE FUNCTION tree(filepath TEXT)
@@ -169,7 +164,7 @@ DECLARE
     _id UUID;
 BEGIN
     --- sanitize inputs
-    PERFORM validfpath(filepath);
+    filepath = sanitizefpath(filepath, TRUE, 'tree');
 
     SELECT s.id
     FROM stat(filepath) AS s
@@ -206,8 +201,6 @@ COMMENT ON FUNCTION tree IS 'The tree function returns all files and directories
 
 
 
-
-
 -- touch: The touch function is used to create a new file.
 -- It takes a file path and a name as parameters,
 -- then creates a new file with the provided name in the specified directory.
@@ -219,7 +212,7 @@ DECLARE
     _id UUID;
 BEGIN
     --- sanitize inputs
-    PERFORM validfpath(filepath);
+    filepath = sanitizefpath(filepath, TRUE, 'touch');
     PERFORM validfname(fname::TEXT);
 
     SELECT s.id
@@ -236,8 +229,6 @@ COMMENT ON FUNCTION touch IS 'This function is used to create a new file.';
 
 
 
-
-
 -- mkdir: The mkdir function creates a new directory.
 -- It creates all the directories in the file path that do not exist already.
 CREATE OR REPLACE FUNCTION mkdir(filepath TEXT)
@@ -247,12 +238,11 @@ $$
 DECLARE
     _id        UUID;
     _parent_id UUID;
-    _path      TEXT[] := STRING_TO_ARRAY(filepath, '/');
+    _path      TEXT[] := STRING_TO_ARRAY(sanitizefpath(filepath, FALSE, 'mkdir'), '/');
     _name      TEXT;
 BEGIN
     --- sanitize inputs
-    PERFORM validfpath(filepath);
-    PERFORM denyroot(filepath, 'mkdir');
+    filepath = sanitizefpath(filepath, FALSE, 'mkdir');
 
     -- Iterates over each part of the path
     FOR i IN 1..ARRAY_LENGTH(_path, 1)
@@ -283,8 +273,6 @@ COMMENT ON FUNCTION mkdir IS 'This function creates a new directory recursively.
 
 
 
-
-
 -- mv: The mv function is used to move or rename files or directories.
 -- It takes an old file path and a new file path as parameters,
 -- and moves the file or directory from the old path to the new path.
@@ -296,14 +284,12 @@ DECLARE
     _old_id          UUID;
     _new_parent_id   UUID;
     _new_name        TEXT;
-    _new_path        TEXT[] := STRING_TO_ARRAY(newpath, '/');
+    _new_path        TEXT[] := STRING_TO_ARRAY(sanitizefpath(newpath, FALSE, 'mv'), '/');
     _new_parent_path TEXT;
 BEGIN
     --- sanitize inputs
-    PERFORM validfpath(oldpath);
-    PERFORM denyroot(oldpath, 'mv');
-    PERFORM validfpath(newpath);
-    PERFORM denyroot(newpath, 'mv');
+    oldpath = sanitizefpath(oldpath, FALSE, 'mv');
+    newpath = sanitizefpath(newpath, FALSE, 'mv');
 
     -- If old path doesn't exist, raise an error
     SELECT s.id
@@ -343,8 +329,6 @@ COMMENT ON FUNCTION mv IS 'The mv function is used to move or rename files or di
 
 
 
-
-
 -- rm: The rm function is used to delete a file or directory.
 -- It takes a file path as a parameter and deletes the file or directory at that path.
 CREATE OR REPLACE FUNCTION rm(filepath TEXT)
@@ -355,8 +339,7 @@ DECLARE
     _id UUID;
 BEGIN
     --- sanitize inputs
-    PERFORM validfpath(filepath);
-    PERFORM denyroot(filepath, 'rm');
+    filepath = sanitizefpath(filepath, FALSE, 'rm');
 
     SELECT s.id
     FROM stat(filepath) AS s
@@ -370,8 +353,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION rm IS 'The rm function is used to delete a file or directory recursively, Equivalent to rm -rf';
-
-
 
 
 
@@ -389,7 +370,6 @@ COMMENT ON FUNCTION rm IS 'This function deletes all files and directories excep
 
 
 
-
 -- parseroot: This function takes a file path as input. If the file path is an empty string,
 -- it returns '/', else it returns the file path itself.
 CREATE OR REPLACE FUNCTION parseroot(filepath TEXT)
@@ -404,7 +384,6 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
-
 
 
 
@@ -427,12 +406,19 @@ $$
 
 
 
-
-CREATE OR REPLACE FUNCTION validfpath(filepath TEXT)
-    RETURNS VOID
+CREATE OR REPLACE FUNCTION sanitizefpath(filepath TEXT, root BOOL, op TEXT)
+    RETURNS TEXT
 AS
 $$
 BEGIN
+    -- root path is not allowed for few operations
+    IF root = FALSE AND filepath = '/' THEN
+        RAISE EXCEPTION 'operation % not allowed on root directory', op USING ERRCODE = 'D0006';
+    END IF;
+    -- remove last slash from path, /data/d1/ to /data/d1
+    IF filepath <> '/' AND filepath ~ '/$' THEN
+        filepath = SUBSTRING(filepath, 1, LENGTH(filepath) - 1);
+    END IF;
     -- first, check if the filepath is not NULL or an empty string.
     -- next, ensure it starts with a slash (/).
     -- then, check if it doesn't contain any null characters or any segment starting with a space.
@@ -442,20 +428,8 @@ BEGIN
     ELSE
         RAISE EXCEPTION 'invalid filepath %', filepath USING ERRCODE = 'D0006';
     END IF;
+
+    RETURN filepath;
 END;
 $$ LANGUAGE plpgsql;
 
-
-
-
--- if filepath is / (root) then throw exception. useful for function like rm('/')
-CREATE OR REPLACE FUNCTION denyroot(filepath TEXT, op TEXT)
-    RETURNS VOID
-AS
-$$
-BEGIN
-    IF filepath = '/' THEN
-        RAISE EXCEPTION 'operation % not allowed on root directory', op USING ERRCODE = 'D0006';
-    END IF;
-END ;
-$$ LANGUAGE plpgsql;
